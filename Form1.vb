@@ -3376,6 +3376,8 @@ Public Class Form1
                     hex = vp0123(ss(1), hex, 1)
                     hex = vp0123(ss(2), hex, 2)
                     hex = vp0123(ss(3).Replace("]", ""), hex, 3)
+                ElseIf mips = ".word" Then
+                    hex = valword(str.Trim)
                 End If
 
                 asm = "0x" & Convert.ToString(hex, 16).ToUpper.PadLeft(8, "0"c)
@@ -4009,6 +4011,8 @@ Public Class Form1
         Dim valhexm As Match = valhex.Match(str)
         Dim valdec As New Regex("(\x20|,|\t)(\+|-)?\d{1,5}\(")
         Dim valdecm As Match = valdec.Match(str)
+        Dim vallb As New Regex("(\x20|,|\t)s?(lower_).*?\(")
+        Dim vallbm As Match = vallb.Match(str)
         Dim k As Integer = 0
         If valhexm.Success Then
             Dim s As String = valhexm.Value
@@ -4020,9 +4024,35 @@ Public Class Form1
                 k = Convert.ToInt32(s.Replace("$", "").Remove(0, 1).Replace("(", ""), 16)
             End If
             hex = hex Or (k And &HFFFF)
-        End If
-        If valdecm.Success Then
+        ElseIf valdecm.Success Then
             hex = hex Or (Convert.ToInt32(valdecm.Value.Remove(0, 1).Replace("(", "")) And &HFFFF)
+        Else
+            Dim j As Integer = 0
+            Dim sl As Integer = 0
+            If vallbm.Success Then
+                sl = 2
+                str = vallbm.Value.Remove(0, 1).Replace("(", "")
+                str = str.Remove(0, str.IndexOf("_") + 1)
+                For j = 0 To 255
+                    If label(j) = str Then
+                        Exit For
+                    End If
+                Next
+                If (j < 255) Then
+                    k = label_addr(j)
+                    If k < &H1800000 Then
+                        k += &H8800000
+                    End If
+                    If (sl And 2) = 2 Then
+                        k = k And &HFFFF
+                    End If
+                    hex = hex Or k
+                Else
+                    MessageBox.Show(str & "に該当するラベルがみつかりませんでした", "")
+                End If
+            Else
+                MessageBox.Show(str & "でラベルを使用する場合はラベル名の前にslowerかlower_をつけて下さい", "")
+            End If
         End If
         Return hex
     End Function
@@ -4051,6 +4081,8 @@ Public Class Form1
         Dim valhexm As Match = valhex.Match(str)
         Dim valdec As New Regex("(\x20|,|\t)(\+|-)?\d{1,5}\(")
         Dim valdecm As Match = valdec.Match(str)
+        Dim vallb As New Regex("(\x20|,|\t)s?(lower_).*?\(")
+        Dim vallbm As Match = vallb.Match(str)
         Dim k As Integer = 0
         If valhexm.Success Then
             Dim s As String = valhexm.Value
@@ -4062,9 +4094,35 @@ Public Class Form1
                 k = Convert.ToInt32(s.Replace("$", "").Remove(0, 1).Replace("(", ""), 16)
             End If
             hex = hex Or (k And &HFFFC)
-        End If
-        If valdecm.Success Then
+        ElseIf valdecm.Success Then
             hex = hex Or (Convert.ToInt32(valdecm.Value.Remove(0, 1).Replace("(", "")) And &HFFFC)
+        Else
+            Dim j As Integer = 0
+            Dim sl As Integer = 0
+            If vallbm.Success Then
+                sl = 2
+                str = vallbm.Value.Remove(0, 1).Replace("(", "")
+                str = str.Remove(0, str.IndexOf("_") + 1)
+                For j = 0 To 255
+                    If label(j) = str Then
+                        Exit For
+                    End If
+                Next
+                If (j < 255) Then
+                    k = label_addr(j)
+                    If k < &H1800000 Then
+                        k += &H8800000
+                    End If
+                    If (sl And 2) = 2 Then
+                        k = k And &HFFFF
+                    End If
+                    hex = hex Or (k And &HFFFC)
+                Else
+                    MessageBox.Show(str & "に該当するラベルがみつかりませんでした", "")
+                End If
+            Else
+                MessageBox.Show(str & "でラベルを使用する場合はラベル名の前にslowerかlower_をつけて下さい", "")
+            End If
         End If
         Return hex
     End Function
@@ -4089,7 +4147,7 @@ Public Class Form1
         Dim valfloat As New Regex("(\x20|,)-?\d+\.?\d*f$")
         Dim valfloatm As Match = valfloat.Match(str)
         Dim valhfloat As New Regex("(\x20|,)-?\d+\.?\d*hf$")
-        Dim vallb As New Regex("(\x20|,)(upper_|lower_)")
+        Dim vallb As New Regex("(\x20|,)s?(upper_|lower_)")
         Dim vallbm As Match = vallb.Match(str)
         Dim valhfloatm As Match = valhfloat.Match(str)
         If valhexm.Success Then
@@ -4142,6 +4200,9 @@ Public Class Form1
                 Else
                     sl = 2
                 End If
+                If vallbm.Value.Contains("s") Then
+                    sl += 4
+                End If
                 str = str.Replace(vallbm.Value.Remove(0, 1), "")
                 cma = vallbm.Index
             End If
@@ -4156,9 +4217,14 @@ Public Class Form1
                 If k < &H1800000 Then
                     k += &H8800000
                 End If
-                If sl = 1 Then
-                    k = k >> 16
-                ElseIf sl = 2 Then
+                If (sl And 1) = 1 Then
+                    If (sl And 4) = 4 AndAlso (k And &HFFFF) >= &H8000 Then
+                        k = k >> 16
+                        k += 1
+                    Else
+                        k = k >> 16
+                    End If
+                ElseIf (sl And 2) = 2 Then
                     k = k And &HFFFF
                 End If
                 hex = hex Or k
@@ -4174,7 +4240,7 @@ Public Class Form1
         Dim valhexm As Match = valhex.Match(str)
         Dim valdec As New Regex("(\x20|,)-?\d{1,10}$")
         Dim valdecm As Match = valdec.Match(str)
-        Dim vallb As New Regex("(\x20|,)(upper_|lower_)")
+        Dim vallb As New Regex("(\x20|,)s?(upper_|lower_)")
         Dim vallbm As Match = vallb.Match(str)
         Dim minus As Int64 = 0
         If valhexm.Success Then
@@ -4193,10 +4259,13 @@ Public Class Form1
             Dim j As Integer = 0
             Dim sl As Integer = 0
             If vallbm.Success Then
-                If vallbm.Value.Contains("upper") Then
+                If vallbm.Value.Contains("up") Then
                     sl = 1
                 Else
                     sl = 2
+                End If
+                If vallbm.Value.Contains("s") Then
+                    sl += 4
                 End If
                 str = str.Replace(vallbm.Value, "")
             End If
@@ -4215,9 +4284,14 @@ Public Class Form1
                 If k < &H1800000 Then
                     k += &H8800000
                 End If
-                If sl = 1 Then
-                    k = k >> 16
-                ElseIf sl = 2 Then
+                If (sl And 1) = 1 Then
+                    If (sl And 4) = 4 AndAlso (k And &HFFFF) >= &H8000 Then
+                        k = k >> 16
+                        k += 1
+                    Else
+                        k = k >> 16
+                    End If
+                ElseIf (sl And 2) = 2 Then
                     k = k And &HFFFF
                 End If
                 minus = k
@@ -4354,13 +4428,14 @@ Public Class Form1
 
     Dim label(255) As String
     Dim label_addr(255) As Integer
+    Dim normalize As String
 
     Private Sub Button1_Click(sender As System.Object, e As System.EventArgs) Handles cvt_asm2code.Click
         Dim sa As New StringBuilder
         Dim st As Integer = Convert.ToInt32(ADDR.Text, 16)
         If MODE.SelectedIndex = 4 Then
-            Dim ss As String() = Regex.Split((ASM.Text & vbCrLf), "setpc")
             cvtget(st, (ASM.Text & vbCrLf), 1)
+            Dim ss As String() = Regex.Split(normalize, "setpc")
             sa.Append(cvtget(st, ss(0), 2))
             For i = 1 To ss.Length - 1
                 Dim sts As String = ss(i).Substring(0, ss(i).IndexOf(vbLf)).Trim
@@ -4377,7 +4452,7 @@ Public Class Form1
     Private Function cvtget(ByVal st As Integer, ByVal asms As String, ByVal selm As Integer) As String
         Dim ss As String() = (asms).Split(CChar(vbLf))
         Dim sb As New StringBuilder
-        Dim sa As New StringBuilder
+        'Dim sa As New StringBuilder
         Dim sc As New StringBuilder
         Dim i As Integer = st
         Dim modesel As Integer = MODE.SelectedIndex
@@ -4405,7 +4480,6 @@ Public Class Form1
         Dim odd As Boolean = False
         Dim odd2 As Boolean = False
         If selm < 2 Then
-
 
             Dim psdis As New Regex("(\t|\x20|　)*?(#|;).+$")
             Dim llb As New Regex("^.*?:( |\t|　)+")
@@ -4466,7 +4540,7 @@ Public Class Form1
                         Case "ulv.q"
                         Case "usv.q"
                         Case Else
-                                sc.AppendLine(s.Trim)
+                            sc.AppendLine(s.Trim)
                     End Select
                 Else
                     sc.AppendLine(s.Trim)
@@ -4474,6 +4548,7 @@ Public Class Form1
             Next
 
             ss = sc.ToString.Split(CChar(vbLf))
+            normalize = sc.ToString
             Array.Clear(label, 0, 256)
             Array.Clear(label_addr, 0, 256)
 
@@ -4494,9 +4569,7 @@ Public Class Form1
                     label(ct) = s.Remove(0, 5).ToLower.Trim
                     label_addr(ct) = ii
                     ct += 1
-                ElseIf s.Length > 5 AndAlso s.Contains(".word") Then
-                    ii += 4
-                ElseIf s.Length > 7 AndAlso s.Contains(".string") Then
+                ElseIf s.Length > 7 AndAlso s.Substring(0, 7) = ".string" Then
                     Dim b As Byte() = getstring(s.Trim)
                     ii += b.Length + 1
                     If (ii And 3) <> 0 Then
@@ -4530,12 +4603,6 @@ Public Class Form1
                 ElseIf s.Length > 2 AndAlso (s.Substring(0, 3) = "FNC") Then
                 ElseIf s.Length > 2 AndAlso s.Substring(s.Length - 2, 1) = ":" Then
                 ElseIf s.Length > 4 AndAlso s.Substring(0, 5) = "label" Then
-                ElseIf s.Length > 5 AndAlso s.Contains(".word") Then
-                    sb.Append("0x")
-                    sb.Append(Convert.ToString(i, 16).ToUpper.PadLeft(8, "0"c))
-                    sb.Append(" 0x")
-                    sb.AppendLine((valword(s.Trim)).ToString("X8"))
-                    i += 4
                 ElseIf s.Length > 5 AndAlso s.Substring(0, 5) = "setpc" Then
                     setpc = offset_boolean(s.Trim, 0) << 2
                     If setpc <> 0 Then
@@ -4546,7 +4613,7 @@ Public Class Form1
                         End If
                         i = setpc
                     End If
-                ElseIf s.Length > 7 AndAlso s.Contains(".string") Then
+                ElseIf s.Length > 7 AndAlso s.Substring(0, 7) = ".string" Then
                     Dim b As Byte() = getstring(s.Trim)
                     Dim j As Integer = b.Length + 1
                     Dim k As Integer = 0
@@ -4576,24 +4643,54 @@ Public Class Form1
                         Else
                             Select Case modesel
                                 Case 4
-                                    sa.Append("_M 0x")
-                                    sa.Append(Convert.ToString((i + k) And &HFFFFFFF, 16).ToUpper.PadLeft(8, "0"c))
-                                    sa.Append(" 0x")
-                                    sa.AppendLine(BitConverter.ToInt32(b, k).ToString("X8"))
+                                    If odd = False Then
+                                        sb.Append("_M 0x")
+                                        sb.Append(BitConverter.ToInt32(b, k).ToString("X8"))
+                                        sb.Append(" 0x")
+                                        odd = True
+                                    Else
+                                        sb.AppendLine(BitConverter.ToInt32(b, k).ToString("X8"))
+                                        odd = False
+                                    End If
                                 Case 5
-                                    sa.Append("_N 0x")
-                                    sa.Append(Convert.ToString((i + k) And &HFFFFFFF, 16).ToUpper.PadLeft(8, "0"c))
-                                    sa.Append(" 0x")
-                                    sa.AppendLine(BitConverter.ToInt32(b, k).ToString("X8"))
+                                    If odd = False Then
+                                        sb.Append("_N 0x")
+                                        sb.Append(BitConverter.ToInt32(b, k).ToString("X8"))
+                                        sb.Append(" 0x")
+                                        odd = True
+                                    Else
+                                        sb.AppendLine(BitConverter.ToInt32(b, k).ToString("X8"))
+                                        odd = False
+                                    End If
                                 Case 6
-                                    sa.Append("_L 0x")
-                                    sa.Append(Convert.ToString((i + k) Or &H20000000, 16).ToUpper.PadLeft(8, "0"c))
-                                    sa.Append(" 0x")
-                                    sa.AppendLine(BitConverter.ToInt32(b, k).ToString("X8"))
+                                    If odd = False Then
+                                        sb.Append("_L 0x")
+                                        cmfst = BitConverter.ToInt32(b, k).ToString("X8")
+                                        If modesel > 6 Then
+                                            cmfaddrval(0) = Convert.ToInt64(cmfst, 16)
+                                        Else
+                                            sb.Append(cmfst)
+                                            sb.Append(" 0x")
+                                        End If
+                                        odd = True
+                                    Else
+                                        cmfst = BitConverter.ToInt32(b, k).ToString("X8")
+                                        If modesel > 6 Then
+                                            cmfaddrval(1) = Convert.ToInt64(cmfst, 16)
+                                            cmfaddrval = EncryptCB(cmfaddrval)
+                                            If (modesel = 8) Then
+                                                cmfaddrval = SwapFF(cmfaddrval)
+                                                cmfaddrval = EncryptCB(cmfaddrval)
+                                            End If
+                                            sb.Append(cmfaddrval(0).ToString("X8"))
+                                            sb.Append(" 0x")
+                                            sb.AppendLine(cmfaddrval(1).ToString("X8"))
+                                        Else
+                                            sb.AppendLine(cmfst)
+                                        End If
+                                        odd = False
+                                    End If
                             End Select
-                        End If
-                        If odd2 = True Then
-                            sa.AppendLine("0x00000000")
                         End If
                         k += 4
                     End While
@@ -4724,7 +4821,7 @@ Public Class Form1
                 sb.Insert(0, "_L 0xF00000" & ((i And 255) >> 4).ToString("X2") & " 0x000000" & (MODE.SelectedIndex - 6).ToString("X2") & vbCrLf)
             End If
         End If
-        Return sa.ToString & sb.ToString
+        Return sb.ToString
     End Function
 
     Private Sub only_hexdicimal(sender As System.Object, e As System.Windows.Forms.KeyPressEventArgs) Handles ADDR.KeyPress
