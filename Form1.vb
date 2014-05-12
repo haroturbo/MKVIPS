@@ -5850,12 +5850,12 @@ Public Class Form1
             For Each s As String In ss
                 psdism = psdis.Match(s.Trim)
                 If psdism.Success Then
-                    s = s.Substring(0, psdism.Index)
+                    s = s.Trim().Substring(0, psdism.Index)
                 End If
                 llbm = llb.Match(s.Trim)
                 If llbm.Success Then
                     sc.AppendLine(llbm.Value.Trim)
-                    s = s.Remove(0, llbm.Length)
+                    s = s.Trim().Remove(0, llbm.Length)
                 End If
                 sheadm = shead.Match(s.Trim)
                 s = s.Trim
@@ -5916,7 +5916,7 @@ Public Class Form1
                                 sc.AppendLine((k And &HFFFF).ToString("X4"))
                             End If
                             If k = 0 Then
-                                sc.Append(s.Trim)
+                                sc.AppendLine(s.Trim)
                             End If
                         Case ".ascii"
                             rg = s.Remove(0, 6).Trim
@@ -6917,5 +6917,30 @@ Public Class Form1
 
     Private Sub cr_Click(sender As System.Object, e As System.EventArgs) Handles cr.Click
         cr.Checked = Not cr.Checked
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Dim ss As String() = CODE.Text.Split(CChar(vbLf))
+        Dim rg As New Regex("^_L 0x[0-9A-Fa-f]{8} 0x[0-9A-Fa-f]{8}")
+        Dim m As Match
+        Dim sb As New StringBuilder
+        Dim k As Integer
+        For Each s In ss
+            m = rg.Match(s)
+            If m.Success Then
+                k = Convert.ToInt32(s.Substring(5, 8), 16)
+                k = k Xor &HD6F73BEE
+                sb.Append("_L 0x")
+                sb.Append(k.ToString("X8"))
+                sb.AppendLine(s.Remove(0, 13))
+
+            Else
+                sb.AppendLine(s.Trim)
+            End If
+
+        Next
+
+        CODE.Text = sb.ToString
+
     End Sub
 End Class
